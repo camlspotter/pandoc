@@ -52,7 +52,7 @@ wrapHTML tag atrs doc =
             Nothing -> ""
             Just s -> " " ++ s
 
-inlines = cat . intersperse space . map inline
+inlines = cat . map inline
     
 inline i = case i of
     Str str -> text str
@@ -81,7 +81,11 @@ inline i = case i of
         text $ "<img" ++ alt ++ " src=\"" ++ url ++ "\"/>"
 
 blocks :: [Block] -> Doc
-blocks blks = cat $ intersperse cr $ map block blks
+blocks [] = empty
+blocks [blk] = block blk
+blocks (blk:blks@(Para _:_)) = block blk <> blankline <> blocks blks
+blocks (blk:blks) = block blk <> cr <> blocks blks
+
 
 block :: Block -> Doc
 
@@ -89,7 +93,7 @@ block Null = empty
 
 block (Plain is) = inlines is
 
-block (Para is) = blankline <> inlines is -- CR jfuruse: it inserts an unnecessary blankline at the head of pars
+block (Para is) = inlines is -- the newline is inserted by blocks
 
 block (BlockQuote blks) = 
     ">>" 
