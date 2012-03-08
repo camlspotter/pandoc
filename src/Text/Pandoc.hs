@@ -141,6 +141,7 @@ import Text.Pandoc.Writers.MediaWiki
 import Text.Pandoc.Writers.Textile
 import Text.Pandoc.Writers.Org
 import Text.Pandoc.Writers.AsciiDoc
+import Text.Pandoc.Writers.Hatena
 import Text.Pandoc.Templates
 import Text.Pandoc.Parsing
 import Text.Pandoc.Shared
@@ -207,6 +208,8 @@ writers = [("native"       , writeNative)
           ,("rtf"          , writeRTF)
           ,("org"          , writeOrg)
           ,("asciidoc"     , writeAsciiDoc)
+           
+          ,("hatena"       , writeHatena)
           ]
 
 {-# DEPRECATED jsonFilter "Use toJsonFilter instead" #-}
