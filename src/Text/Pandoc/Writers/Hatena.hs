@@ -43,10 +43,10 @@ import Text.Pandoc.Pretty
 prettyList :: [Doc] -> Doc
 prettyList ds = "[" <> (cat $ intersperse (cr <> ",") $ map (nest 1) ds) <> "]"
     
-wrapHTML tag atrs doc = 
-    text ("<"++tag++sp_atrs++">") 
-    <> doc 
-    <> text ("</"++tag++">")
+wrapInline pref post doc = text pref <> doc <> text post
+wrapBlock pref post doc = text pref $$ doc $$ text post
+
+wrapHTML tag atrs = wrapInline ("<"++tag++sp_atrs++">") ("</"++tag++">")
     where 
         sp_atrs = case atrs of
             Nothing -> ""
@@ -54,65 +54,65 @@ wrapHTML tag atrs doc =
 
 inlines = cat . map inline
     
-inline i = case i of
-    Str str -> text str
-    Space -> space
-    Link is (url, _title) -> wrapHTML "a" (Just $ "href=\"" ++ url ++ "\"") $ inlines is
-    Emph is        -> wrapHTML "i"      Nothing $ inlines is
-    Strong is      -> wrapHTML "b"      Nothing $ inlines is
-    Strikeout is   -> wrapHTML "strike" Nothing $ inlines is
-    Superscript is -> wrapHTML "sup"    Nothing $ inlines is
-    Subscript is   -> wrapHTML "sub"    Nothing $ inlines is
-    
-     -- CR jfuruse todo
-    SmallCaps is -> inlines is
-    Quoted quoteType is -> inlines is
-    Code attr str -> wrapHTML "code" Nothing $ text str
-    LineBreak -> text "<br/>"
-    Note blks -> "((" <> blocks blks <> "))" -- don't know if complex thing is inside
-    Cite cites is -> text ("CITE " ++ show cites) <> inlines is
-    Math mathType str -> text ("MATH " ++ show mathType) <> text str
-    RawInline fmt str -> text ("RAWINLINE " ++ show fmt) <> text str
-    Image is (url, _title) ->
-        let alt = case is of
-                [] -> ""
-                _ -> " alt=\"" ++ show is ++ "\""
-        in
-        text $ "<img" ++ alt ++ " src=\"" ++ url ++ "\"/>"
+inline (Str str) = text str
+inline Space =space
+inline (Link is (url, _title)) = wrapHTML "a" (Just $ "href=\"" ++ url ++ "\"") $ inlines is
+inline (Emph is)        = wrapHTML "i"      Nothing $ inlines is
+inline (Strong is)      = wrapHTML "b"      Nothing $ inlines is
+inline (Strikeout is)   = wrapHTML "strike" Nothing $ inlines is
+inline (Superscript is) = wrapHTML "sup"    Nothing $ inlines is
+inline (Subscript is)   = wrapHTML "sub"    Nothing $ inlines is
+-- CR jfuruse todo
+inline (SmallCaps is) = inlines is
+inline (Quoted quoteType is) = inlines is
+inline (Code attr str) = wrapHTML "code" Nothing $ text str
+inline (LineBreak) = text "<br/>"
+inline (Note blks) = "((" <> blocks blks <> "))" -- don't know if complex thing is inside
+inline (Cite cites is) = text ("CITE " ++ show cites) <> inlines is
+inline (Math mathType str) = text ("MATH " ++ show mathType) <> text str
+inline (RawInline fmt str) = text ("RAWINLINE " ++ show fmt) <> text str
+inline (Image is (url, _title) )=
+    text $ "<img" ++ alt ++ " src=\"" ++ url ++ "\"/>"
+    where
+        alt = case is of
+            [] -> ""
+            _ -> " alt=\"" ++ show is ++ "\""
 
+-- The first Para in the blocks are not prefixed by a blankline.
 blocks :: [Block] -> Doc
 blocks [] = empty
 blocks [blk] = block blk
 blocks (blk:blks@(Para _:_)) = block blk <> blankline <> blocks blks
 blocks (blk:blks) = block blk <> cr <> blocks blks
 
-
 block :: Block -> Doc
 
 block Null = empty
-
 block (Plain is) = inlines is
-
-block (Para is) = inlines is -- the newline is inserted by blocks
-
-block (BlockQuote blks) = 
-    ">>" 
-    $$ blocks blks 
-    $$ "<<"
+block (Para is)  = inlines is -- the newline is inserted by blocks
+block (BlockQuote blks) = wrapBlock ">>" "<<" $ blocks blks 
 
 block (BulletList blockLists) = 
-    "<ul>" 
-    $$ vcat (map (\x -> "<li>" <> space <> nest 2 x <> space <> "</li>") $ map blocks blockLists)
-    $$ "</ul>"
+    wrapBlock "<ul>" "</ul>"
+    $ vcat (map (\x -> "<li>" <> space <> nest 2 x <> space <> "</li>") $ map blocks blockLists)
 
 -- block (OrderedList attribs blockLists) = 
 -- --   "OrderedList" <> space <> text (show attribs) $$
 -- --   (prettyList $ map (prettyList . map block) blockLists)
 
-block (CodeBlock attr str) =
-    ">||"
-    $$ text str
-    $$ "||<"
+block (CodeBlock attr str) = 
+    wrapInline "<!-- " " -->" (text $ show attr)
+    $$ wrapBlock start "||<" (text str)
+    where
+        start = case language of
+            Nothing -> ">||"
+            Just s -> ">|" ++ s ++ "|"
+        language = case classes of
+            [] -> Nothing
+            ["sourceCode", lang] -> Just lang
+            _ -> Nothing -- CR jfuruse: I do not know well
+        (_, classes, _) = attr
+            
 
 block (Header lev is) = blankline <> text (stars lev) <> inlines is -- CR jfuruse: No break allowed!!!
     where
